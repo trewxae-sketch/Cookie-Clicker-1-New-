@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Modern Cookie Clicker - Ultimate Social Edition</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.3/firebase-database-compat.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
+
+        /* General Layout */
+        body, html {
+            margin: 0; padding: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            background-color: #121212;
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        /* Game Scene */
+        #game-container {
+            width: 100vw; height: 100vh;
+            background: url('Background.png') no-repeat center center;
+            background-size: cover;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* Score Board */
+        #score-board {
+            position: absolute; top: 6%; left: 20px;
+            background: rgba(255, 255, 255, 0.12);
+            backdrop-filter: blur(20px);
+            padding: 12px 30px;
+            border-radius: 100px;
+            color: #ffffff;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 15px 50px rgba(0,0,0,0.5);
+            z-index: 100;
+            display: flex; align-items: center; gap: 15px;
+        }
+
+        .score-icon { width: 35px; height: 35px; object-fit: contain; }
+        #score-text { font-size: clamp(1.2rem, 5vw, 2rem); font-weight: 600; letter-spacing: 2px; }
+
+        /* Menu Button */
+        #menu-btn {
+            position: absolute; top: 6%; right: 20px;
+            width: 55px; height: 55px;
+            background: rgba(255, 255, 255, 0.15);
+            backdrop-filter: blur(15px);
+            border-radius: 15px;
+            display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            gap: 6px; cursor: pointer;
+            border: 1px solid rgba(255,255,255,0.3);
+            z-index: 1100;
+            transition: 0.3s;
+        }
+        #menu-btn span { width: 30px; height: 3px; background: white; border-radius: 5px; }
+
+        /* Social Panel (Side Panel) */
+        #social-panel {
+            position: fixed; top: 0; right: -100%;
+            width: 100%; height: 100%;
+            background: rgba(10,10,10,0.98);
+            backdrop-filter: blur(20px);
+            z-index: 2000;
+            transition: 0.6s cubic-bezier(0.77, 0, 0.175, 1);
+            overflow-y: auto;
+            color: white; padding: 40px 20px;
+            box-sizing: border-box;
+        }
+        #social-panel.open { right: 0; }
+
+        .panel-section { margin-bottom: 35px; background: rgba(255,255,255,0.03); padding: 20px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.05); }
+        .panel-title { font-size: 24px; font-weight: 600; border-bottom: 3px solid #f9d423; margin-bottom: 20px; padding-bottom: 8px; color: #f9d423; display: flex; justify-content: space-between; }
+
+        /* Global Chat */
+        #chat-box { height: 180px; background: rgba(0,0,0,0.4); border-radius: 15px; overflow-y: auto; padding: 15px; margin-bottom: 12px; border: 1px solid #333; }
+        .msg { font-size: 14px; margin-bottom: 8px; border-bottom: 1px solid #222; padding-bottom: 5px; }
+        .msg b { color: #4facfe; }
+        #chat-input-area { display: flex; gap: 10px; }
+        #chat-input { flex: 1; padding: 12px; border-radius: 10px; border: none; background: #222; color: white; }
+        #send-btn { padding: 10px 20px; background: #f9d423; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: black; }
+
+        /* Leaderboard */
+        .leader-item { display: flex; justify-content: space-between; padding: 12px; background: rgba(255,255,255,0.05); margin-bottom: 8px; border-radius: 10px; }
+        .rank-1 { background: linear-gradient(90deg, #ffd700, #ff8c00); color: black; font-weight: bold; }
+
+        /* Name Overlay */
+        #name-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: #121212; z-index: 5000;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+        }
+        #name-input { padding: 18px; font-size: 20px; border-radius: 15px; border: 2px solid #f9d423; width: 280px; text-align: center; background: #1a1a1a; color: white; }
+        #start-btn { margin-top: 25px; padding: 18px 50px; background: #f9d423; border: none; border-radius: 15px; font-weight: bold; cursor: pointer; }
+
+        /* Cookie Container */
+        #cookie-container { position: relative; width: min(88vw, 360px); height: min(88vw, 360px); display: flex; justify-content: center; align-items: center; cursor: pointer; }
+        #main-cookie { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 30px 60px rgba(0,0,0,0.65)); transition: transform 0.12s; }
+        .controls { position: absolute; bottom: 8%; display: flex; flex-direction: column; gap: 20px; align-items: center; z-index: 200; width: 100%; }
+        .ui-btn { width: clamp(150px, 42vw, 180px); cursor: pointer; transition: 0.4s; border-radius: 30px; }
+        .cooldown { opacity: 0.3; filter: grayscale(1); cursor: not-allowed; }
+
+        /* Store UI */
+        #store-ui {
+            position: fixed; top: 0; right: -100%; 
+            width: 100%; height: 100%;
+            background: linear-gradient(135deg, rgba(0,0,0,0.85) 0%, rgba(30,30,30,0.95) 100%), url('StoreUI.png');
+            background-size: cover; backdrop-filter: blur(25px); z-index: 1500; transition: right 0.8s cubic-bezier(0.77, 0, 0.175, 1); padding: 40px; color: white;
+            box-sizing: border-box;
+        }
+        #store-ui.open { right: 0; }
+        .store-header { font-size: 32px; margin-bottom: 35px; border-bottom: 4px solid rgba(255, 255, 255, 0.15); padding-bottom: 25px; display: flex; justify-content: space-between; font-weight: 600; text-transform: uppercase; }
+        .store-item { background: rgba(255, 255, 255, 0.07); padding: 20px; border-radius: 25px; display: flex; align-items: center; gap: 20px; cursor: pointer; margin-bottom: 22px; transition: 0.3s; }
+        .store-item.disabled { opacity: 0.2; filter: grayscale(1); cursor: not-allowed; }
+        .item-icon { width: 65px; height: 65px; object-fit: contain; }
+
+        /* Animations */
+        .particle { position: absolute; pointer-events: none; animation: crumble 1.5s forwards; }
+        @keyframes crumble { 100% { transform: translate(var(--tx), var(--ty)) rotate(720deg); opacity: 0; } }
+        .fade-out { opacity: 0; transform: scale(0.1) !important; }
+        .shake { animation: biteEffect 0.45s ease-out; }
+        @keyframes biteEffect { 0%, 100% { transform: scale(1); } 25% { transform: scale(0.9) rotate(-6deg); } 50% { transform: scale(1.1) rotate(6deg); } }
+    </style>
+</head>
+<body>
+
+    <div id="name-overlay">
+        <h1 style="color: white; margin-bottom: 10px;">COOKIE CLICKER</h1>
+        <p style="color: #666; margin-bottom: 30px;">Please enter your name:</p>
+        <input type="text" id="name-input" placeholder="Your name..." maxlength="12">
+        <button id="start-btn" onclick="startGame()">START GAME</button>
+    </div>
+
+    <div id="social-panel">
+        <div class="panel-title">
+            <span>MENU</span>
+            <span style="cursor:pointer; color: #ff3e3e;" onclick="toggleMenu()">✕</span>
+        </div>
+
+        <div class="panel-section">
+            <div style="font-size: 20px; color: #f9d423; margin-bottom: 15px;">Settings</div>
+            <p>Music: <input type="checkbox" checked></p>
+            <p>Vibration: <input type="checkbox" checked></p>
+        </div>
+
+        <div class="panel-section">
+            <div style="font-size: 20px; color: #f9d423; margin-bottom: 15px;">Leaderboard</div>
+            <div id="leaderboard-list">Loading...</div>
+            <p style="font-size: 11px; margin-top: 10px; color: #888;">#1 player gets a random reward!</p>
+        </div>
+
+        <div class="panel-section">
+            <div style="font-size: 20px; color: #f9d423; margin-bottom: 15px;">Global Chat</div>
+            <div id="chat-box"></div>
+            <div id="chat-input-area">
+                <input type="text" id="chat-input" placeholder="Type a message...">
+                <button id="send-btn" onclick="sendMessage()">Send</button>
+            </div>
+        </div>
+
+        <div class="panel-section">
+            <div style="font-size: 20px; color: #f9d423; margin-bottom: 15px;">Credits</div>
+            <p><b>Creator:</b> İbrahim Yiğit</p>
+            <p><b>Helper:</b> FipiDev</p>
+            <p><b>Published:</b> January 2026</p>
+            <p><b>Updates:</b> Updates will be released every 30 days.</p>
+        </div>
+    </div>
+
+    <div id="game-container">
+        <div id="menu-btn" onclick="toggleMenu()">
+            <span></span><span></span><span></span>
+        </div>
+
+        <div id="score-board">
+            <img src="Cookie.png" class="score-icon">
+            <span id="score-text">0</span>
+        </div>
+
+        <div id="cookie-container">
+            <img src="Cookie.png" id="main-cookie">
+        </div>
+
+        <div class="controls">
+            <img src="Eat.png" id="eat-btn" class="ui-btn" onclick="processEat()">
+            <img src="Store.png" id="store-btn" class="ui-btn" onclick="toggleStore()">
+        </div>
+
+        <div id="store-ui">
+            <div class="store-header">
+                <span>STORE</span>
+                <span style="cursor:pointer; color: #ff3e3e;" onclick="toggleStore()">✕</span>
+            </div>
+            <div id="item-teeth" class="store-item disabled" onclick="buyTeeth()">
+                <img src="Eat.png" class="item-icon">
+                <div>
+                    <b>Super Teeth</b><br><small>Speed x2 (1s cooldown)</small><br><span style="color:#4facfe">15 🍪</span>
+                </div>
+            </div>
+            <div id="item-grandma" class="store-item disabled" onclick="buyGrandma()">
+                <img src="Cookie.png" class="item-icon">
+                <div>
+                    <b>Grandma</b><br><small>+1 Cookie per sec</small><br><span style="color:#f9d423">40 🍪</span>
+                </div>
+            </div>
+            <div id="item-multiplier" class="store-item disabled" onclick="buyMultiplier()">
+                <img src="Store.png" class="item-icon">
+                <div>
+                    <b>Mega Bite</b><br><small>Profit x2 (Each bite)</small><br><span style="color:#ff0844">100 🍪</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+    // --- FIREBASE CONFIG ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDUBBEwbyi80Y9qcuM7fhrXN8h-wGipnlU",
+      authDomain: "leaderboard-010011.firebaseapp.com",
+      databaseURL: "https://leaderboard-010011-default-rtdb.europe-west1.firebasedatabase.app",
+      projectId: "leaderboard-010011",
+      storageBucket: "leaderboard-010011.firebasestorage.app",
+      messagingSenderId: "654873144400",
+      appId: "1:654873144400:web:3bde56d0ef6ef754493555"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+    // --- VARIABLES ---
+    let playerName = localStorage.getItem('player_name') || "";
+    let score = parseInt(localStorage.getItem('cookie_score')) || 0;
+    let biteStage = 0;
+    let isTransitioning = false;
+    let isCooldown = false;
+    let grandmaCount = parseInt(localStorage.getItem('grandma_count')) || 0;
+    let cooldownDuration = parseInt(localStorage.getItem('cooldown_duration')) || 2000; 
+    let scoreMult = parseInt(localStorage.getItem('score_mult')) || 1;
+
+    const mainImg = document.getElementById('main-cookie');
+    const scoreVal = document.getElementById('score-text');
+    const cookieStages = ['Cookie.png', 'BittenCookie.png', 'MoreBittenCookie.png', 'VeryBittenCookie.png'];
+
+    // --- INITIALIZATION ---
+    if(playerName) {
+        document.getElementById('name-overlay').style.display = 'none';
+        initSocial();
+    }
+
+    function startGame() {
+        const input = document.getElementById('name-input').value.trim();
+        if(input.length < 2) return alert("Name is too short!");
+        playerName = input;
+        localStorage.setItem('player_name', playerName);
+        document.getElementById('name-overlay').style.display = 'none';
+        initSocial();
+    }
+
+    function initSocial() {
+        updateUI();
+        if(grandmaCount > 0) startGrandmaLoop();
+        syncLeaderboard();
+        listenMessages();
+    }
+
+    // --- GAME LOGIC ---
+    function processEat() {
+        if (isTransitioning || isCooldown) return;
+        isCooldown = true;
+        document.getElementById('eat-btn').classList.add('cooldown');
+        
+        setTimeout(() => {
+            isCooldown = false;
+            document.getElementById('eat-btn').classList.remove('cooldown');
+        }, cooldownDuration);
+
+        biteStage++;
+        mainImg.classList.remove('shake');
+        void mainImg.offsetWidth;
+        mainImg.classList.add('shake');
+        createCrumbs(1, 40, 40);
+
+        if (biteStage < 4) {
+            mainImg.src = cookieStages[biteStage];
+        } else {
+            isTransitioning = true;
+            addPoints(1 * scoreMult);
+            mainImg.classList.add('fade-out');
+            createCrumbs(20, 180, 350);
+            setTimeout(() => {
+                biteStage = 0;
+                mainImg.src = cookieStages[0];
+                mainImg.classList.remove('fade-out', 'shake');
+                isTransitioning = false;
+            }, 600);
+        }
+    }
+
+    function addPoints(val) {
+        score += val;
+        updateUI();
+        localStorage.setItem('cookie_score', score);
+        database.ref('leaderboard/' + playerName).set({ score: score });
+    }
+
+    function updateUI() {
+        scoreVal.innerText = score;
+        document.getElementById('item-teeth').classList.toggle('disabled', score < 15);
+        document.getElementById('item-grandma').classList.toggle('disabled', score < 40);
+        document.getElementById('item-multiplier').classList.toggle('disabled', score < 100);
+    }
+
+    // --- STORE ---
+    function buyTeeth() {
+        if (score >= 15) { addPoints(-15); cooldownDuration = 1000; localStorage.setItem('cooldown_duration', 1000); document.getElementById('item-teeth').remove(); }
+    }
+    function buyMultiplier() {
+        if (score >= 100) { addPoints(-100); scoreMult = 2; localStorage.setItem('score_mult', 2); document.getElementById('item-multiplier').remove(); }
+    }
+    function buyGrandma() {
+        if (score >= 40) { addPoints(-40); grandmaCount++; localStorage.setItem('grandma_count', grandmaCount); if(grandmaCount === 1) startGrandmaLoop(); }
+    }
+    function startGrandmaLoop() { setInterval(() => addPoints(grandmaCount), 1000); }
+
+    // --- SOCIAL FUNCTIONS ---
+    function toggleMenu() { document.getElementById('social-panel').classList.toggle('open'); }
+    function toggleStore() { document.getElementById('store-ui').classList.toggle('open'); }
+
+    function sendMessage() {
+        const input = document.getElementById('chat-input');
+        if(!input.value.trim()) return;
+        database.ref('messages').push({ name: playerName, text: input.value, time: Date.now() });
+        input.value = "";
+    }
+
+    function listenMessages() {
+        database.ref('messages').limitToLast(15).on('value', snap => {
+            const box = document.getElementById('chat-box');
+            box.innerHTML = "";
+            snap.forEach(child => {
+                const d = child.val();
+                box.innerHTML += `<div class="msg"><b>${d.name}:</b> ${d.text}</div>`;
+            });
+            box.scrollTop = box.scrollHeight;
+        });
+    }
+
+    function syncLeaderboard() {
+        database.ref('leaderboard').orderByChild('score').limitToLast(10).on('value', snap => {
+            const list = document.getElementById('leaderboard-list');
+            list.innerHTML = "";
+            let arr = [];
+            snap.forEach(c => { arr.push({ n: c.key, s: c.val().score }); });
+            arr.reverse().forEach((p, i) => {
+                const cls = i === 0 ? "rank-1" : "";
+                list.innerHTML += `<div class="leader-item ${cls}"><span>#${i+1} ${p.n}</span> <span>${p.s} 🍪</span></div>`;
+            });
+        });
+    }
+
+    function createCrumbs(num, rx, ry) {
+        for (let i = 0; i < num; i++) {
+            const p = document.createElement('div');
+            p.className = 'particle';
+            p.style.width = '10px'; p.style.height = '10px'; p.style.background = '#8B4513';
+            p.style.left = '50%'; p.style.top = '50%';
+            p.style.setProperty('--tx', (Math.random()-0.5)*rx*2 + 'px');
+            p.style.setProperty('--ty', (Math.random())*ry + 'px');
+            document.body.appendChild(p);
+            setTimeout(() => p.remove(), 1500);
+        }
+    }
+</script>
+</body>
+</html>
